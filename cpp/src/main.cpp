@@ -1,6 +1,7 @@
 // adsb_replay: feed a recorded ADS-B CSV through the tracking core and print
 // periodic track-table snapshots plus end-of-run statistics.
 
+#include <cmath>
 #include <cstdio>
 #include <exception>
 #include <string>
@@ -12,8 +13,10 @@
 
 namespace {
 
-void printSnapshot(const adsb::TrackManager& manager, double now) {
-    std::printf("\n=== t=%.0fs | active tracks: %zu ===\n", now,
+void printSnapshot(const adsb::TrackManager& manager, double now, double t0) {
+    // Display time relative to replay start: live sessions carry unix-epoch
+    // timestamps, which are unreadable in a table header.
+    std::printf("\n=== t=+%.0fs | active tracks: %zu ===\n", now - t0,
                 manager.tracks().size());
     std::printf("%-4s %-8s %10s %11s %8s %7s %6s %5s %5s\n", "TRK", "ICAO24",
                 "LAT", "LON", "ALT[m]", "SPD[m/s]", "HDG", "AGE", "HITS");
@@ -57,18 +60,23 @@ int main(int argc, char** argv) {
     std::printf("frame origin: %.4f, %.4f | coast limit: 30s\n",
                 frame.refLatitude(), frame.refLongitude());
 
-    double next_snapshot = measurements.front().timestamp + snapshot_interval;
+    const double t0 = measurements.front().timestamp;
+    double next_snapshot = t0 + snapshot_interval;
     for (const adsb::Measurement& m : measurements) {
-        while (m.timestamp >= next_snapshot) {
+        if (m.timestamp >= next_snapshot) {
             manager.pruneStale(next_snapshot);
-            printSnapshot(manager, next_snapshot);
-            next_snapshot += snapshot_interval;
+            printSnapshot(manager, next_snapshot, t0);
+            // Jump to the first boundary after this measurement: a session
+            // with a long quiet gap gets one snapshot, not one per interval.
+            const double intervals_past =
+                std::floor((m.timestamp - next_snapshot) / snapshot_interval);
+            next_snapshot += (intervals_past + 1.0) * snapshot_interval;
         }
         manager.processMeasurement(m);
     }
     const double t_end = measurements.back().timestamp;
     manager.pruneStale(t_end);
-    printSnapshot(manager, t_end);
+    printSnapshot(manager, t_end, t0);
 
     std::printf("\n--- replay summary ---\n");
     std::printf("measurements processed : %d\n", manager.measurementsProcessed());

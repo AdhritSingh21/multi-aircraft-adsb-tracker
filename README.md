@@ -6,8 +6,9 @@ filter and prunes stale tracks; ingestion, association, a WebSocket API, and a
 live map dashboard are layered on incrementally (see
 [PROJECT_PLAN.md](PROJECT_PLAN.md)).
 
-**Status: Milestone 1 complete** — sample-data replay tracker with tested
-Kalman filtering and track management.
+**Status: Milestone 2 complete** — live ADS-B ingestion (recorded a real
+36-aircraft session over Columbus, OH and replayed it through the C++ core)
+plus deterministic simulated and replay modes.
 
 ```
 === t=70s | active tracks: 2 ===
@@ -41,6 +42,37 @@ tracks active at end   : 2
 No external C++ dependencies — the 4x4 filter math is written out directly and
 tests use a small assert-based harness wired into CTest.
 
+## What it does (Milestone 2)
+
+- **Live ingestion** from keyless community ADS-B aggregators speaking the
+  readsb/ADS-B-Exchange v2 API (`adsb.lol`, `airplanes.live`), plus an
+  OpenSky Network `/states/all` client. Normalizers convert everything to SI
+  (feet→m, knots→m/s, ms-epoch→s, positions backdated by their age) so every
+  layer downstream speaks one measurement format.
+- **Recorder**: polls a source, dedupes re-reported states on
+  `(aircraft, timestamp)`, and appends to a session CSV — flushed every poll,
+  so an interrupted recording is still replayable; transient poll failures
+  retry, repeated failures abort cleanly.
+- **Replay mode**: re-emits any session with original (or scaled) timing —
+  the repeatable-demo path the M4 backend will consume.
+- **Simulated source**: deterministic OpenSky-shaped fleet (fixed seed) so
+  the full record pipeline runs offline with identical output every run.
+
+```sh
+# one live fetch (100 nm around Columbus, OH), normalized CSV to stdout
+python -m ingest snapshot
+
+# record 90 s of live traffic, then replay it through the C++ tracker
+python -m ingest record --out data/session_live.csv --duration 90
+cpp/build/adsb_replay data/session_live.csv
+
+# offline: deterministic simulated session
+python -m ingest record --out data/session_sim.csv --source sim --duration 75 --interval 5
+
+# repeatable demo: emit a session with live pacing at 10x
+python -m ingest replay data/session_live.csv --speed 10
+```
+
 ## Layout
 
 ```
@@ -49,8 +81,11 @@ cpp/                C++ tracking core (library + replay demo + tests)
                     track_manager.hpp, csv_replay.hpp
   src/              implementations + main.cpp (adsb_replay)
   tests/            unit tests (assert-based harness, CTest-registered)
-data/               sample_adsb.csv + generate_sample.py (deterministic)
-ingest/ backend/ dashboard/   later milestones (see PROJECT_PLAN.md)
+ingest/             Python ingestion: opensky.py + readsb.py (clients),
+                    recorder.py, replayer.py, simsource.py, cli.py
+  tests/            pytest suites (no network required)
+data/               sample_adsb.csv + generate_sample.py, recorded sessions
+backend/ dashboard/  later milestones (see PROJECT_PLAN.md)
 ```
 
 ## Build & run
@@ -70,6 +105,12 @@ cpp/build/adsb_replay data/sample_adsb.csv
 
 On Windows with MinGW GCC, executables are linked `-static` so they run
 without the compiler's `bin` directory on PATH.
+
+### Python ingestion tests
+
+```sh
+python -m pytest ingest/tests -q     # from the repo root; stdlib-only code, pytest to run
+```
 
 ### Regenerating sample data
 
@@ -97,7 +138,6 @@ created, stale tracks pruned) are reproducible.
 
 ## Roadmap
 
-M2 live/recorded OpenSky ingestion → M3 gated nearest-neighbor (+ Hungarian)
-association → M4 FastAPI/WebSocket backend → M5 React map dashboard →
-M6 metrics & polish. Details and acceptance criteria:
-[PROJECT_PLAN.md](PROJECT_PLAN.md).
+M3 gated nearest-neighbor (+ Hungarian) association → M4 FastAPI/WebSocket
+backend → M5 React map dashboard → M6 metrics & polish. Details and
+acceptance criteria: [PROJECT_PLAN.md](PROJECT_PLAN.md).

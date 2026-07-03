@@ -89,11 +89,18 @@ adsb-tracker/
   measurements, (c) stale tracks are pruned, (d) multiple aircraft yield
   separate tracks. README documents build/run/test.
 
-### M2 — Live/simulated ADS-B ingestion
-- [ ] Python ingestion from OpenSky Network REST API (anonymous tier)
-- [ ] Normalizer → common measurement CSV/NDJSON format
-- [ ] Recorder (capture live data to file) + replay mode for repeatable demos
-- **Accepted when:** a recorded live session can be replayed through the C++ core.
+### M2 — Live/simulated ADS-B ingestion  ✅
+- [x] Live ingestion clients: readsb-style v2 point API (adsb.lol,
+  airplanes.live — keyless, default) and OpenSky `/states/all` (implemented
+  and unit-tested; the host was unreachable from the dev network, so live
+  acceptance ran against adsb.lol)
+- [x] Normalizers → common measurement format (SI units; feet/knots/ms-epoch
+  conversions for readsb sources)
+- [x] Recorder (poll → dedupe → session CSV, failure-tolerant) + deterministic
+  simulated source + timed replay mode for repeatable demos
+- **Accepted when:** a recorded live session can be replayed through the C++
+  core. ✅ 90 s live recording (300 measurements, 36 aircraft) → `adsb_replay`
+  → 37 tracks, 5 stale pruned, clean exit.
 
 ### M3 — Track association
 - [ ] Mahalanobis gating using filter innovation covariance
