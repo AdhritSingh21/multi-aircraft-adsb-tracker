@@ -6,9 +6,10 @@ filter and prunes stale tracks; ingestion, association, a WebSocket API, and a
 live map dashboard are layered on incrementally (see
 [PROJECT_PLAN.md](PROJECT_PLAN.md)).
 
-**Status: Milestone 2 complete** — live ADS-B ingestion (recorded a real
-36-aircraft session over Columbus, OH and replayed it through the C++ core)
-plus deterministic simulated and replay modes.
+**Status: Milestone 3 complete** — geometric track association (chi²-gated
+nearest-neighbor and Hungarian assignment) with identities hidden from the
+tracker: **100%** association accuracy on the sample replay, **99.23%** on a
+real 36-aircraft live session, scored against ADS-B ids as ground truth.
 
 ```
 === t=70s | active tracks: 2 ===
@@ -72,6 +73,33 @@ python -m ingest record --out data/session_sim.csv --source sim --duration 75 --
 # repeatable demo: emit a session with live pacing at 10x
 python -m ingest replay data/session_live.csv --speed 10
 ```
+
+## What it does (Milestone 3)
+
+- **Geometric association** — the tracker no longer needs to trust ADS-B
+  identity. Each scan, every track is predicted forward, measurements are
+  gated by squared Mahalanobis distance against the filter's innovation
+  covariance (chi², 2 DOF, 99%), and assignments are solved by either
+  gated greedy nearest-neighbor or the Hungarian algorithm (Kuhn–Munkres,
+  global-optimal). Unassigned measurements spawn new tracks.
+- **Honest scoring** — in `--assoc nn|hungarian` modes the replay tool hides
+  identities from the tracker and scores every association decision against
+  the held-back ADS-B ids:
+
+```sh
+cpp/build/adsb_replay data/session_live_columbus.csv --assoc hungarian
+# --- association score (hungarian, ids hidden) ---
+# associations scored    : 259
+# correct (vs ADS-B id)  : 257
+# association accuracy   : 99.23%
+```
+
+  Measured: 100% (70/70) on the sample replay, 99.23% (257/259) on the live
+  36-aircraft session. Greedy NN and Hungarian score identically on this
+  data (traffic is rarely close enough for the crossing case; the unit tests
+  demonstrate where Hungarian wins). Known limitation: sustained maneuvers
+  can fragment a track (visible as extra `tracks created`) — process-noise
+  tuning planned for M6.
 
 ## Layout
 
@@ -138,6 +166,6 @@ created, stale tracks pruned) are reproducible.
 
 ## Roadmap
 
-M3 gated nearest-neighbor (+ Hungarian) association → M4 FastAPI/WebSocket
-backend → M5 React map dashboard → M6 metrics & polish. Details and
-acceptance criteria: [PROJECT_PLAN.md](PROJECT_PLAN.md).
+M4 FastAPI/WebSocket backend → M5 React map dashboard → M6 metrics & polish
+(incl. process-noise tuning for maneuver robustness). Details and acceptance
+criteria: [PROJECT_PLAN.md](PROJECT_PLAN.md).

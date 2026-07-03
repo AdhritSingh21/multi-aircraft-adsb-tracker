@@ -21,7 +21,11 @@ struct Track {
     KalmanFilter filter;
 
     double first_seen_time = 0.0;
-    double last_update_time = 0.0;
+    double last_update_time = 0.0;  // last measurement fused (staleness clock)
+    double filter_time = 0.0;       // time the filter state is valid at
+                                    // (advances on every predict, not just
+                                    // updates — geometric association predicts
+                                    // all tracks each scan)
     int hit_count = 0;             // measurements fused into this track
 
     double altitude = 0.0;         // smoothed barometric/GNSS altitude [m]

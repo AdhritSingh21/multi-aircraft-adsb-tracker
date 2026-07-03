@@ -2,12 +2,15 @@
 // each test function registers checks; main() reports PASS/FAIL per test and
 // exits nonzero if anything failed (CTest-compatible).
 
+#include <algorithm>
 #include <cmath>
 #include <cstdio>
+#include <numeric>
 #include <sstream>
 #include <string>
 #include <vector>
 
+#include "adsb/association.hpp"
 #include "adsb/csv_replay.hpp"
 #include "adsb/kalman_filter.hpp"
 #include "adsb/measurement.hpp"
@@ -237,6 +240,140 @@ void testManagerPrunesStaleTracks() {
     CHECK(manager.pruneStale(40.0) == 0);
 }
 
+// --------------------------------------------------------------- Association
+
+void testGreedyNearestNeighborRespectsGate() {
+    // Measurement 0 is closest to track 0, measurement 1 to track 1;
+    // track 2 is inside nobody's gate.
+    const std::vector<std::vector<double>> cost = {{1.0, 5.0, 100.0},
+                                                   {4.0, 2.0, 100.0}};
+    const auto a = adsb::greedyNearestNeighbor(cost, adsb::kDefaultGateChi2);
+    CHECK(a.size() == 2);
+    CHECK(a[0] == 0);
+    CHECK(a[1] == 1);
+
+    // Everything outside the gate -> unassigned.
+    const auto b = adsb::greedyNearestNeighbor({{10.0, 10.0, 10.0}},
+                                               adsb::kDefaultGateChi2);
+    CHECK(b.size() == 1);
+    CHECK(b[0] == -1);
+}
+
+void testHungarianBeatsGreedyOnCrossingCosts() {
+    // The classic trap: greedy grabs the global minimum (0,0)=1 and is then
+    // forced into (1,1)=100 (total 101). The optimum is (0,1)+(1,0) = 4.
+    const std::vector<std::vector<double>> cost = {{1.0, 2.0},
+                                                   {2.0, 100.0}};
+    const double gate = 1000.0;  // everything admissible for this unit test
+
+    const auto greedy = adsb::greedyNearestNeighbor(cost, gate);
+    CHECK(greedy[0] == 0);
+    CHECK(greedy[1] == 1);  // suboptimal, by construction
+
+    const auto optimal = adsb::hungarianAssign(cost, gate);
+    CHECK(optimal[0] == 1);
+    CHECK(optimal[1] == 0);
+}
+
+void testHungarianMatchesBruteForceOptimum() {
+    const std::vector<std::vector<double>> cost = {{7.0, 5.0, 11.0, 8.0},
+                                                   {5.0, 6.0, 9.0, 7.0},
+                                                   {9.0, 10.0, 3.0, 2.0},
+                                                   {6.0, 4.0, 8.0, 5.0}};
+    // Brute force: best total over all 24 permutations.
+    std::vector<int> perm = {0, 1, 2, 3};
+    double best = 1e18;
+    do {
+        double total = 0.0;
+        for (int i = 0; i < 4; ++i) total += cost[i][perm[i]];
+        best = std::min(best, total);
+    } while (std::next_permutation(perm.begin(), perm.end()));
+
+    const auto a = adsb::hungarianAssign(cost, 1e9);
+    double total = 0.0;
+    for (int i = 0; i < 4; ++i) {
+        CHECK(a[i] >= 0);
+        total += cost[i][a[i]];
+    }
+    CHECK_NEAR(total, best, 1e-9);
+}
+
+void testProcessScanAssociatesWithoutIdentity() {
+    const adsb::LocalFrame frame(40.0, -83.0);
+    adsb::TrackManagerConfig cfg;
+    cfg.association = adsb::AssociationMode::kNearestNeighbor;
+    adsb::TrackManager manager(frame, cfg);
+
+    // Two aircraft ~70 km apart, identities blank (non-cooperative case).
+    // A: eastbound 200 m/s at 40.0N. B: southbound 150 m/s at 40.5N.
+    std::vector<adsb::Measurement> scan1 = {
+        makeMeas("", 0.0, 40.0, -83.0, 10000.0, 200.0, 90.0),
+        makeMeas("", 0.0, 40.5, -82.5, 8000.0, 150.0, 180.0)};
+    const auto r1 = manager.processScan(scan1);
+    CHECK(r1.size() == 2);
+    CHECK(r1[0].created_new_track);
+    CHECK(r1[1].created_new_track);
+    const int track_a = r1[0].track_id;
+    const int track_b = r1[1].track_id;
+    CHECK(track_a != track_b);
+
+    // 5 s later, both moved along their velocity vectors:
+    // A: +1000 m east (~0.0117 deg lon at 40N); B: -750 m north (~0.00674 deg).
+    std::vector<adsb::Measurement> scan2 = {
+        makeMeas("", 5.0, 40.0, -82.9883, 10000.0, 200.0, 90.0),
+        makeMeas("", 5.0, 40.49326, -82.5, 8000.0, 150.0, 180.0)};
+    const auto r2 = manager.processScan(scan2);
+    CHECK(r2.size() == 2);
+    CHECK(!r2[0].created_new_track);
+    CHECK(!r2[1].created_new_track);
+    CHECK(r2[0].track_id == track_a);  // continuity purely from kinematics
+    CHECK(r2[1].track_id == track_b);
+    CHECK(manager.tracks().size() == 2);
+    CHECK(manager.tracks()[0].hit_count == 2);
+    CHECK(manager.tracks()[1].hit_count == 2);
+}
+
+void testProcessScanOutOfGateSpawnsNewTrack() {
+    const adsb::LocalFrame frame(40.0, -83.0);
+    adsb::TrackManagerConfig cfg;
+    cfg.association = adsb::AssociationMode::kNearestNeighbor;
+    adsb::TrackManager manager(frame, cfg);
+
+    std::vector<adsb::Measurement> scan1 = {
+        makeMeas("", 0.0, 40.0, -83.0, 10000.0, 200.0, 90.0)};
+    manager.processScan(scan1);
+
+    // 5 s later a report 20+ km away: kinematically impossible for the
+    // existing track, so it must fail the chi^2 gate and spawn a new track.
+    std::vector<adsb::Measurement> scan2 = {
+        makeMeas("", 5.0, 40.2, -83.0, 5000.0, 100.0, 0.0)};
+    const auto r = manager.processScan(scan2);
+    CHECK(r.size() == 1);
+    CHECK(r[0].created_new_track);
+    CHECK(manager.tracks().size() == 2);
+}
+
+void testRepeatedPredictEqualsSinglePredict() {
+    // Per-scan predicts must compose: predict(5)+predict(5) == predict(10)
+    // for the linear CV model, or geometric association would corrupt
+    // coasting tracks. Guards the filter_time bookkeeping design.
+    adsb::KalmanFilter a(2.0, 50.0), b(2.0, 50.0);
+    a.init(100.0, -50.0, 120.0, 30.0, 2500.0, 400.0);
+    b.init(100.0, -50.0, 120.0, 30.0, 2500.0, 400.0);
+
+    a.predict(5.0);
+    a.predict(5.0);
+    b.predict(10.0);
+
+    CHECK_NEAR(a.x(), b.x(), 1e-9);
+    CHECK_NEAR(a.y(), b.y(), 1e-9);
+    CHECK_NEAR(a.vx(), b.vx(), 1e-9);
+    CHECK_NEAR(a.vy(), b.vy(), 1e-9);
+    CHECK_NEAR(a.positionVariance(), b.positionVariance(), 1e-6);
+    CHECK_NEAR(a.mahalanobisSq(1300.0, 250.0), b.mahalanobisSq(1300.0, 250.0),
+               1e-9);
+}
+
 // ---------------------------------------------------------------- CSV replay
 
 void testCsvLoaderParsesSortsAndSkipsBadRows() {
@@ -276,6 +413,17 @@ int main() {
     runTest("manager_separate_tracks_per_aircraft",
             testManagerSeparateTracksPerAircraft);
     runTest("manager_prunes_stale_tracks", testManagerPrunesStaleTracks);
+    runTest("greedy_nn_respects_gate", testGreedyNearestNeighborRespectsGate);
+    runTest("hungarian_beats_greedy_on_crossing_costs",
+            testHungarianBeatsGreedyOnCrossingCosts);
+    runTest("hungarian_matches_brute_force_optimum",
+            testHungarianMatchesBruteForceOptimum);
+    runTest("process_scan_associates_without_identity",
+            testProcessScanAssociatesWithoutIdentity);
+    runTest("process_scan_out_of_gate_spawns_new_track",
+            testProcessScanOutOfGateSpawnsNewTrack);
+    runTest("repeated_predict_equals_single_predict",
+            testRepeatedPredictEqualsSinglePredict);
     runTest("csv_loader_parses_sorts_and_skips_bad_rows",
             testCsvLoaderParsesSortsAndSkipsBadRows);
 

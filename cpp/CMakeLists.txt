@@ -7,6 +7,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 add_library(adsb_core
     src/kalman_filter.cpp
     src/track_manager.cpp
+    src/association.cpp
     src/csv_replay.cpp
 )
 target_include_directories(adsb_core PUBLIC include)

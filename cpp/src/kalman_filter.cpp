@@ -63,13 +63,18 @@ void KalmanFilter::predict(double dt) {
         }
     }
 
-    // White-noise-acceleration process noise per axis:
-    //   Q = q * [dt^4/4  dt^3/2]
-    //           [dt^3/2  dt^2  ]
+    // Continuous white-noise-acceleration process noise per axis:
+    //   Q = q * [dt^3/3  dt^2/2]
+    //           [dt^2/2  dt    ]
+    // (exact discretization of continuous accel noise — unlike the
+    // piecewise-constant dt^4/4 form, predict(a)+predict(b) == predict(a+b),
+    // so uncertainty growth doesn't depend on how often we predict; the
+    // geometric associator predicts every scan at whatever cadence data
+    // arrives.)
     const double dt2 = dt * dt;
-    const double q11 = q_ * dt2 * dt2 / 4.0;
-    const double q12 = q_ * dt2 * dt / 2.0;
-    const double q22 = q_ * dt2;
+    const double q11 = q_ * dt2 * dt / 3.0;
+    const double q12 = q_ * dt2 / 2.0;
+    const double q22 = q_ * dt;
     P_[0][0] += q11;
     P_[0][2] += q12;
     P_[2][0] += q12;

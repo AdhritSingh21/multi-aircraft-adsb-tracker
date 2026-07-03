@@ -3,10 +3,18 @@
 #include <string>
 #include <vector>
 
+#include "adsb/association.hpp"
 #include "adsb/measurement.hpp"
 #include "adsb/track.hpp"
 
 namespace adsb {
+
+// How incoming measurements are matched to existing tracks.
+enum class AssociationMode {
+    kById,             // trust the ADS-B identity (cooperative-sensor baseline)
+    kNearestNeighbor,  // gated greedy nearest neighbor on Mahalanobis distance
+    kHungarian,        // gated global-optimal assignment (Kuhn–Munkres)
+};
 
 struct TrackManagerConfig {
     double max_coast_seconds = 30.0;  // prune tracks not updated for this long
@@ -16,18 +24,38 @@ struct TrackManagerConfig {
     double init_vel_var = 25.0 * 25.0;     // new-track velocity variance [(m/s)^2]
     double altitude_alpha = 0.3;      // altitude exponential-smoothing gain
     std::size_t max_history = 200;    // trail points kept per track
+
+    AssociationMode association = AssociationMode::kById;
+    double gate_chi2 = kDefaultGateChi2;  // association gate (chi^2, 2 DOF)
 };
 
-// Maintains the set of active tracks. Milestone 1 associates measurements to
-// tracks by ADS-B aircraft_id (the honest baseline — ADS-B is a cooperative
-// sensor). Milestone 3 replaces this with gated geometric association so the
-// pipeline also works when identity is unreliable or withheld.
+// What happened to one measurement: which track absorbed it, and whether
+// that track was newly created for it. Lets callers (tests, the replay
+// evaluator) score association decisions against ground truth.
+struct ScanResult {
+    int measurement_index = 0;
+    int track_id = 0;
+    bool created_new_track = false;
+};
+
+// Maintains the set of active tracks. Two operating styles:
+//  - processMeasurement(): streaming, associates by ADS-B aircraft_id.
+//  - processScan(): batch of (roughly) simultaneous measurements, associated
+//    per the configured AssociationMode — geometric modes ignore identity
+//    entirely, as a non-cooperative sensor would have to.
 class TrackManager {
 public:
     TrackManager(const LocalFrame& frame, TrackManagerConfig cfg = {});
 
-    // Fuse one measurement: update the matching track or start a new one.
-    void processMeasurement(const Measurement& m);
+    // Fuse one measurement by aircraft_id: update the matching track or
+    // start a new one.
+    ScanResult processMeasurement(const Measurement& m);
+
+    // Fuse one scan. All tracks are first predicted to the scan time; in
+    // geometric modes measurements are then gated (chi^2 on Mahalanobis
+    // distance) and assigned (greedy NN or Hungarian); unassigned
+    // measurements spawn new tracks. Results are per input measurement.
+    std::vector<ScanResult> processScan(const std::vector<Measurement>& scan);
 
     // Remove tracks whose last update is older than max_coast_seconds.
     // Returns the number of tracks removed.
@@ -47,6 +75,10 @@ public:
 private:
     Track* findByAircraftId(const std::string& aircraft_id);
     Track makeTrack(const Measurement& m, double x, double y);
+    // Filter update + display fields + staleness clock (no predict — the
+    // caller is responsible for having predicted the filter to ~m.timestamp).
+    void fuseMeasurement(Track& t, const Measurement& m, double zx, double zy);
+    void appendHistory(Track& t, double timestamp);
 
     LocalFrame frame_;
     TrackManagerConfig cfg_;

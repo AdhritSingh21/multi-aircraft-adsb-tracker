@@ -102,12 +102,19 @@ adsb-tracker/
   core. ✅ 90 s live recording (300 measurements, 36 aircraft) → `adsb_replay`
   → 37 tracks, 5 stale pruned, clean exit.
 
-### M3 — Track association
-- [ ] Mahalanobis gating using filter innovation covariance
-- [ ] Nearest-neighbor assignment (ignore ADS-B id to prove association works)
-- [ ] Optional: Hungarian algorithm for global assignment
-- **Accepted when:** association accuracy ≥ target on replay data with id hidden,
-  measured against ADS-B ids as ground truth.
+### M3 — Track association  ✅
+- [x] Mahalanobis gating using filter innovation covariance (chi², 2 DOF, 99%)
+- [x] Nearest-neighbor assignment (ADS-B ids hidden from the tracker)
+- [x] Hungarian algorithm (Kuhn–Munkres) for global assignment
+- [x] Process model corrected to continuous WNA discretization so covariance
+  growth is independent of prediction cadence (predict(a)+predict(b) ≡
+  predict(a+b) — locked in by a unit test)
+- **Accepted when:** association accuracy ≥ target on replay data with id
+  hidden, measured against ADS-B ids as ground truth. ✅ Measured: **100%**
+  (70/70) on the 3-aircraft sample; **99.23%** (257/259) on the 36-aircraft
+  live Columbus session; nn and Hungarian identical on this data. Known
+  limitation (deferred to M6 tuning): track fragmentation during sustained
+  maneuvers (8 tracks created for 3 sample aircraft).
 
 ### M4 — API/backend
 - [ ] FastAPI service exposing `GET /tracks` (JSON)

@@ -7,10 +7,13 @@ namespace adsb {
 //   state x = [x_east, y_north, vx_east, vy_north]   (meters, m/s)
 //   measurement z = [x_east, y_north]                (meters)
 //
-// Process noise follows the white-noise-acceleration model: unmodeled
-// accelerations (turns, speed changes) enter as noise of strength
-// sigma_accel [m/s^2]. Measurement noise is isotropic position noise of
-// sigma_pos [m], appropriate for ADS-B GNSS-derived positions.
+// Process noise follows the continuous white-noise-acceleration model:
+// unmodeled accelerations (turns, speed changes) enter as white noise of
+// intensity sigma_accel^2 [(m/s^2)^2 * s]. This discretization composes
+// exactly — predict(a) then predict(b) equals predict(a+b) — so covariance
+// growth is independent of prediction cadence. Measurement noise is
+// isotropic position noise of sigma_pos [m], appropriate for ADS-B
+// GNSS-derived positions.
 class KalmanFilter {
 public:
     static constexpr int kStateDim = 4;
