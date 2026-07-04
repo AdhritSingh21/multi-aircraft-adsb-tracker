@@ -129,11 +129,24 @@ adsb-tracker/
   34→32 active tracks as stale tracks pruned); `/tracks` cache advanced in
   step. 17 C++ tests (100 checks) + 30 Python tests green.
 
-### M5 — Dashboard
-- [ ] React/Vite app, live map (Leaflet) with aircraft positions + trails
-- [ ] Track table: ID, callsign, speed, altitude, update age
-- [ ] Metrics bar: active tracks, update rate, stale tracks removed
-- **Accepted when:** dashboard renders live replay session end-to-end.
+### M5 — Dashboard  ✅
+- [x] React/Vite (TypeScript) app; live air picture with aircraft positions
+  + trails — implemented as a dependency-free SVG radar-style plot (range
+  rings, heading-oriented markers, same tangent-plane projection as the C++
+  core) instead of Leaflet: offline-safe demos, zero map-tile dependency
+  (Leaflet remains an optional M6 upgrade)
+- [x] Track table: track #, ICAO, lat/lon, altitude, speed, update age
+  (stale rows tinted)
+- [x] Metrics bar: active tracks, update rate (client-derived from WS
+  arrival times), stale tracks removed, tracks created, measurements,
+  LIVE/OFFLINE badge
+- [x] Single WS hook with capped-backoff reconnect; Vite dev proxy to the
+  M4 backend (no CORS changes)
+- **Accepted when:** dashboard renders live replay session end-to-end. ✅
+  Verified: strict-TS build clean; probes green through the Vite proxy
+  (HTTP + WS); user visually confirmed plot, markers, labels, metrics,
+  LIVE badge, and track table during a replayed 36-aircraft session
+  (31 concurrent tracks observed).
 
 ### M6 — Polish for GitHub/resume
 - [ ] Architecture diagram, README polish, screenshots/GIF

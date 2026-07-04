@@ -1,0 +1,219 @@
+:root {
+  --bg: #0b0f14;
+  --panel: #101720;
+  --line: #1d2836;
+  --text: #c9d6e2;
+  --dim: #6b7d8f;
+  --accent: #58e08c;
+  --amber: #e0b458;
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: "Segoe UI", system-ui, sans-serif;
+}
+
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: 12px 16px;
+  gap: 12px;
+}
+
+header {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+}
+
+header h1 {
+  margin: 0;
+  font-size: 1.15rem;
+  letter-spacing: 0.04em;
+  color: var(--accent);
+}
+
+header .sub {
+  color: var(--dim);
+  font-size: 0.8rem;
+}
+
+/* metrics bar */
+.metrics {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.badge {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  padding: 4px 10px;
+  border-radius: 3px;
+}
+
+.badge.live {
+  background: rgba(88, 224, 140, 0.15);
+  color: var(--accent);
+  border: 1px solid var(--accent);
+}
+
+.badge.offline {
+  background: rgba(224, 88, 88, 0.15);
+  color: #e05858;
+  border: 1px solid #e05858;
+}
+
+.metric {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 6px 14px;
+  text-align: center;
+  min-width: 92px;
+}
+
+.metric-value {
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+}
+
+.metric-label {
+  font-size: 0.66rem;
+  color: var(--dim);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+/* main layout */
+main {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(340px, 1fr);
+  gap: 12px;
+  flex: 1;
+  min-height: 0;
+}
+
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* air picture (SVG) */
+.air-picture {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.air-picture .axis {
+  stroke: var(--line);
+  stroke-width: 0.15%;
+}
+
+.air-picture .ring {
+  fill: none;
+  stroke: var(--line);
+  stroke-width: 0.15%;
+  stroke-dasharray: 1% 0.6%;
+}
+
+.air-picture .ring-label {
+  fill: var(--dim);
+}
+
+.air-picture .marker {
+  fill: var(--accent);
+}
+
+.air-picture .trail {
+  fill: none;
+  stroke: var(--accent);
+  opacity: 0.45;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+.air-picture .label {
+  fill: var(--text);
+  opacity: 0.85;
+}
+
+.air-picture .track.stale .marker {
+  fill: var(--amber);
+}
+
+.air-picture .track.stale .trail {
+  stroke: var(--amber);
+}
+
+/* track table */
+.track-table-wrap {
+  height: 100%;
+  overflow-y: auto;
+}
+
+.track-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.78rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.track-table th {
+  position: sticky;
+  top: 0;
+  background: var(--panel);
+  color: var(--dim);
+  text-align: right;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--line);
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+}
+
+.track-table th:first-child,
+.track-table td:first-child,
+.track-table th:nth-child(2),
+.track-table td:nth-child(2) {
+  text-align: left;
+}
+
+.track-table td {
+  text-align: right;
+  padding: 5px 10px;
+  border-bottom: 1px solid rgba(29, 40, 54, 0.5);
+  color: var(--text);
+}
+
+.track-table tr.stale td {
+  color: var(--amber);
+  opacity: 0.75;
+}
+
+.track-table td.empty {
+  text-align: center;
+  color: var(--dim);
+  padding: 24px;
+}

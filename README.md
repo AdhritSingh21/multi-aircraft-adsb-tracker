@@ -6,9 +6,9 @@ filter and prunes stale tracks; ingestion, association, a WebSocket API, and a
 live map dashboard are layered on incrementally (see
 [PROJECT_PLAN.md](PROJECT_PLAN.md)).
 
-**Status: Milestone 4 complete** — FastAPI/WebSocket backend streaming the
-C++ tracker's state live: `GET /tracks`, `WS /ws` broadcasting every new
-snapshot while a recorded session replays through the tracking core.
+**Status: Milestone 5 complete** — live React/Vite dashboard: SVG
+radar-style air picture (markers, trails, range rings), track table, and
+live metrics, streaming from the C++ tracker over WebSocket.
 
 ```
 === t=70s | active tracks: 2 ===
@@ -126,6 +126,31 @@ curl http://127.0.0.1:8000/tracks     # JSON snapshot
 # ws://127.0.0.1:8000/ws              # push stream for the dashboard (M5)
 ```
 
+## What it does (Milestone 5)
+
+- **Dashboard** (`dashboard/`, React + Vite + TypeScript, no runtime deps
+  beyond React): a dark radar-style **SVG air picture** — heading-oriented
+  aircraft markers, trail polylines, range rings, expand-only auto-fit —
+  using the same local tangent-plane projection as the C++ tracking core.
+  Deliberately tile-free: demos are fully offline and deterministic.
+- **Track table**: track #, ICAO, lat/lon, altitude, speed, update age;
+  rows tint amber as a track nears the coast limit.
+- **Metrics bar**: active tracks, update rate (derived client-side from
+  WebSocket arrival times), stale tracks removed, tracks created,
+  measurements, and a LIVE/OFFLINE connection badge.
+- One `useTrackStream` hook: seeds from `GET /tracks`, then follows
+  `WS /ws` with capped-backoff reconnect. The Vite dev server proxies
+  `/tracks`, `/healthz`, and `/ws` to the backend — no CORS configuration.
+
+```sh
+# terminal 1: backend replaying the recorded session (see Milestone 4)
+uvicorn backend.app:app --port 8000
+
+# terminal 2: dashboard
+cd dashboard && npm install && npm run dev
+# open http://localhost:5173
+```
+
 ## Layout
 
 ```
@@ -139,8 +164,9 @@ ingest/             Python ingestion: opensky.py + readsb.py (clients),
   tests/            pytest suites (no network required)
 backend/            FastAPI + WebSocket server (bridge.py spawns adsb_stream)
   tests/            API tests (fake bridge) + subprocess integration tests
+dashboard/          React/Vite dashboard: SVG air picture, track table,
+                    metrics bar (src/useTrackStream.ts + 3 components)
 data/               sample_adsb.csv + generate_sample.py, recorded sessions
-dashboard/          Milestone 5 (see PROJECT_PLAN.md)
 ```
 
 ## Build & run
@@ -193,6 +219,7 @@ created, stale tracks pruned) are reproducible.
 
 ## Roadmap
 
-M5 React map dashboard → M6 metrics & polish (incl. process-noise tuning for
-maneuver robustness). Details and acceptance criteria:
+M6 metrics & polish: process-noise tuning for maneuver robustness,
+architecture diagram, replay-measured performance numbers, optional Leaflet
+basemap upgrade. Details and acceptance criteria:
 [PROJECT_PLAN.md](PROJECT_PLAN.md).
