@@ -6,10 +6,9 @@ filter and prunes stale tracks; ingestion, association, a WebSocket API, and a
 live map dashboard are layered on incrementally (see
 [PROJECT_PLAN.md](PROJECT_PLAN.md)).
 
-**Status: Milestone 3 complete** — geometric track association (chi²-gated
-nearest-neighbor and Hungarian assignment) with identities hidden from the
-tracker: **100%** association accuracy on the sample replay, **99.23%** on a
-real 36-aircraft live session, scored against ADS-B ids as ground truth.
+**Status: Milestone 4 complete** — FastAPI/WebSocket backend streaming the
+C++ tracker's state live: `GET /tracks`, `WS /ws` broadcasting every new
+snapshot while a recorded session replays through the tracking core.
 
 ```
 === t=70s | active tracks: 2 ===
@@ -101,6 +100,32 @@ cpp/build/adsb_replay data/session_live_columbus.csv --assoc hungarian
   can fragment a track (visible as extra `tracks created`) — process-noise
   tuning planned for M6.
 
+## What it does (Milestone 4)
+
+- **`adsb_stream`** — a thin C++ bridge over the same tracking core: reads
+  normalized measurement CSV lines plus `TICK <t>` commands on stdin, runs
+  each scan through `TrackManager` (any `--assoc` mode), and emits one JSON
+  snapshot per tick on stdout. A clean line protocol between components —
+  the Python backend never reimplements tracking.
+- **FastAPI backend** (`backend/`) — spawns `adsb_stream`, feeds it from a
+  replayed session (`ingest.replayer`, speed-scaled) or a live poll
+  (`ingest.readsb`), and serves:
+  - `GET /tracks` — latest snapshot (tracks + stats) as JSON
+  - `GET /healthz` — API + tracker-subprocess liveness
+  - `WS /ws` — latest snapshot on connect, then every new snapshot
+
+```sh
+pip install -r backend/requirements.txt
+
+# stream a recorded session at 10x (defaults shown; all env-overridable)
+uvicorn backend.app:app --port 8000
+#   ADSB_SESSION=data/session_sim.csv ADSB_SPEED=10 ADSB_ASSOC=id
+#   ADSB_SOURCE=live for live polling instead of replay
+
+curl http://127.0.0.1:8000/tracks     # JSON snapshot
+# ws://127.0.0.1:8000/ws              # push stream for the dashboard (M5)
+```
+
 ## Layout
 
 ```
@@ -112,8 +137,10 @@ cpp/                C++ tracking core (library + replay demo + tests)
 ingest/             Python ingestion: opensky.py + readsb.py (clients),
                     recorder.py, replayer.py, simsource.py, cli.py
   tests/            pytest suites (no network required)
+backend/            FastAPI + WebSocket server (bridge.py spawns adsb_stream)
+  tests/            API tests (fake bridge) + subprocess integration tests
 data/               sample_adsb.csv + generate_sample.py, recorded sessions
-backend/ dashboard/  later milestones (see PROJECT_PLAN.md)
+dashboard/          Milestone 5 (see PROJECT_PLAN.md)
 ```
 
 ## Build & run
@@ -166,6 +193,6 @@ created, stale tracks pruned) are reproducible.
 
 ## Roadmap
 
-M4 FastAPI/WebSocket backend → M5 React map dashboard → M6 metrics & polish
-(incl. process-noise tuning for maneuver robustness). Details and acceptance
-criteria: [PROJECT_PLAN.md](PROJECT_PLAN.md).
+M5 React map dashboard → M6 metrics & polish (incl. process-noise tuning for
+maneuver robustness). Details and acceptance criteria:
+[PROJECT_PLAN.md](PROJECT_PLAN.md).

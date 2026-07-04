@@ -9,6 +9,7 @@ add_library(adsb_core
     src/track_manager.cpp
     src/association.cpp
     src/csv_replay.cpp
+    src/json_out.cpp
 )
 target_include_directories(adsb_core PUBLIC include)
 
@@ -21,6 +22,9 @@ endif()
 add_executable(adsb_replay src/main.cpp)
 target_link_libraries(adsb_replay PRIVATE adsb_core)
 
+add_executable(adsb_stream src/stream_main.cpp)
+target_link_libraries(adsb_stream PRIVATE adsb_core)
+
 enable_testing()
 add_executable(adsb_tests tests/test_main.cpp)
 target_link_libraries(adsb_tests PRIVATE adsb_core)
@@ -30,5 +34,6 @@ add_test(NAME unit_tests COMMAND adsb_tests)
 # compiler's bin directory on PATH.
 if(MINGW)
     target_link_options(adsb_replay PRIVATE -static)
+    target_link_options(adsb_stream PRIVATE -static)
     target_link_options(adsb_tests PRIVATE -static)
 endif()

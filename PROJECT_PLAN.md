@@ -116,10 +116,18 @@ adsb-tracker/
   limitation (deferred to M6 tuning): track fragmentation during sustained
   maneuvers (8 tracks created for 3 sample aircraft).
 
-### M4 — API/backend
-- [ ] FastAPI service exposing `GET /tracks` (JSON)
-- [ ] WebSocket streaming of track updates
-- **Accepted when:** client receives live track updates over WebSocket.
+### M4 — API/backend  ✅
+- [x] `adsb_stream`: C++ line-protocol bridge (measurement CSV + `TICK t` on
+  stdin → one NDJSON snapshot per tick on stdout; same adsb_core tracker)
+- [x] FastAPI service exposing `GET /tracks` (JSON) + `GET /healthz`
+- [x] WebSocket streaming of track updates (`WS /ws`, latest on connect)
+- [x] Feeds: session replay at speed ×N (reuses `ingest.replayer`), optional
+  live polling (reuses `ingest.readsb`)
+- **Accepted when:** client receives live track updates over WebSocket during
+  a replayed session. ✅ E2E verified: WS client received fresh broadcast
+  frames mid-replay of the recorded live session (183→185 measurements,
+  34→32 active tracks as stale tracks pruned); `/tracks` cache advanced in
+  step. 17 C++ tests (100 checks) + 30 Python tests green.
 
 ### M5 — Dashboard
 - [ ] React/Vite app, live map (Leaflet) with aircraft positions + trails

@@ -12,6 +12,7 @@
 
 #include "adsb/association.hpp"
 #include "adsb/csv_replay.hpp"
+#include "adsb/json_out.hpp"
 #include "adsb/kalman_filter.hpp"
 #include "adsb/measurement.hpp"
 #include "adsb/track_manager.hpp"
@@ -376,6 +377,49 @@ void testRepeatedPredictEqualsSinglePredict() {
 
 // ---------------------------------------------------------------- CSV replay
 
+void testParseMeasurementLine() {
+    adsb::Measurement m;
+    CHECK(adsb::parseMeasurementLine(
+        "abc123,10.5,40.1,-82.9,10500,220,90\r", m));  // CRLF stripped
+    CHECK(m.aircraft_id == "abc123");
+    CHECK_NEAR(m.timestamp, 10.5, 1e-12);
+    CHECK_NEAR(m.longitude, -82.9, 1e-12);
+
+    CHECK(!adsb::parseMeasurementLine(
+        "aircraft_id,timestamp,latitude,longitude,altitude,velocity,heading",
+        m));                                            // header
+    CHECK(!adsb::parseMeasurementLine("# comment", m));
+    CHECK(!adsb::parseMeasurementLine("", m));
+    CHECK(!adsb::parseMeasurementLine("abc,1.0,40.0", m));  // short row
+    CHECK(!adsb::parseMeasurementLine("abc,x,40,-82,1,2,3", m));  // bad num
+}
+
+void testJsonSnapshotSerialization() {
+    // Escaping first: quotes, backslashes, control characters.
+    CHECK(adsb::jsonEscape("a\"b\\c\nd") == "a\\\"b\\\\c\\nd");
+
+    const adsb::LocalFrame frame(40.0, -83.0);
+    adsb::TrackManager manager(frame);
+    manager.processMeasurement(makeMeas("aaa111", 0.0, 40.1, -82.9));
+    manager.processMeasurement(makeMeas("bbb222", 1.0, 39.9, -83.1));
+
+    const std::string j = adsb::snapshotToJson(manager, 5.0);
+    const auto has = [&](const char* needle) {
+        return j.find(needle) != std::string::npos;
+    };
+    CHECK(has("\"time\":5.0"));
+    CHECK(has("\"id\":1"));
+    CHECK(has("\"icao\":\"aaa111\""));
+    CHECK(has("\"icao\":\"bbb222\""));
+    CHECK(has("\"lat\":40.1000"));      // track 1 initialized at measurement
+    CHECK(has("\"age_s\":5.0"));        // aaa111 last updated at t=0
+    CHECK(has("\"trail\":[[40.1"));     // history point present
+    CHECK(has("\"stats\":{\"measurements\":2,\"tracks_created\":2,"
+              "\"stale_removed\":0,\"active\":2}"));
+    // Single line (NDJSON contract).
+    CHECK(j.find('\n') == std::string::npos);
+}
+
 void testCsvLoaderParsesSortsAndSkipsBadRows() {
     std::istringstream csv(
         "# recorded sample\r\n"
@@ -424,6 +468,8 @@ int main() {
             testProcessScanOutOfGateSpawnsNewTrack);
     runTest("repeated_predict_equals_single_predict",
             testRepeatedPredictEqualsSinglePredict);
+    runTest("parse_measurement_line", testParseMeasurementLine);
+    runTest("json_snapshot_serialization", testJsonSnapshotSerialization);
     runTest("csv_loader_parses_sorts_and_skips_bad_rows",
             testCsvLoaderParsesSortsAndSkipsBadRows);
 

@@ -20,48 +20,37 @@ std::vector<std::string> splitFields(const std::string& line) {
 
 }  // namespace
 
+bool parseMeasurementLine(const std::string& raw, Measurement& out) {
+    std::string line = raw;
+    if (!line.empty() && line.back() == '\r') line.pop_back();
+    if (line.empty() || line[0] == '#') return false;
+
+    const auto fields = splitFields(line);
+    if (fields.size() < 7) return false;
+
+    try {
+        Measurement m;
+        m.aircraft_id = fields[0];
+        m.timestamp = std::stod(fields[1]);
+        m.latitude = std::stod(fields[2]);
+        m.longitude = std::stod(fields[3]);
+        m.altitude = std::stod(fields[4]);
+        m.velocity = std::stod(fields[5]);
+        m.heading = std::stod(fields[6]);
+        out = std::move(m);
+        return true;
+    } catch (const std::exception&) {
+        return false;  // header row or unparsable numeric field
+    }
+}
+
 std::vector<Measurement> loadMeasurementsFromStream(std::istream& in) {
     std::vector<Measurement> out;
     std::string line;
-    bool header_skipped = false;
-
+    Measurement m;
     while (std::getline(in, line)) {
-        if (!line.empty() && line.back() == '\r') line.pop_back();
-        if (line.empty() || line[0] == '#') continue;
-        if (!header_skipped) {
-            // First data-looking line: treat as header if it isn't numeric
-            // in the timestamp column.
-            header_skipped = true;
-            const auto fields = splitFields(line);
-            if (fields.size() >= 2) {
-                try {
-                    (void)std::stod(fields[1]);
-                } catch (const std::exception&) {
-                    continue;  // non-numeric second column -> header row
-                }
-            } else {
-                continue;
-            }
-        }
-
-        const auto fields = splitFields(line);
-        if (fields.size() < 7) continue;  // malformed row: skip, don't abort
-
-        try {
-            Measurement m;
-            m.aircraft_id = fields[0];
-            m.timestamp = std::stod(fields[1]);
-            m.latitude = std::stod(fields[2]);
-            m.longitude = std::stod(fields[3]);
-            m.altitude = std::stod(fields[4]);
-            m.velocity = std::stod(fields[5]);
-            m.heading = std::stod(fields[6]);
-            out.push_back(std::move(m));
-        } catch (const std::exception&) {
-            continue;  // unparsable numeric field: skip row
-        }
+        if (parseMeasurementLine(line, m)) out.push_back(m);
     }
-
     std::stable_sort(out.begin(), out.end(),
                      [](const Measurement& a, const Measurement& b) {
                          return a.timestamp < b.timestamp;
