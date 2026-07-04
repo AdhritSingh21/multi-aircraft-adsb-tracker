@@ -1,11 +1,17 @@
-# Multi-Aircraft Tracker from Live ADS-B Data
+# Multi-Aircraft ADS-B Tracker
 
-A real-time multi-target aircraft tracking system: a **C++ tracking core**
+A real-time multi-target aircraft tracking system: a **C++17 tracking core**
 (per-track Kalman filters, χ²-gated nearest-neighbor and Hungarian data
 association) fed by **live ADS-B ingestion**, exposed through a
 **FastAPI/WebSocket backend**, and visualized on a **React dashboard** with
 an SVG radar-style air picture. Built incrementally with tests at every
 milestone and only replay-measured, reproducible performance claims.
+
+![Live dashboard — 29 concurrent aircraft tracked over Columbus, OH](docs/adsb-dashboard-validation.png)
+
+*Live validation run: 29 concurrent tracks maintained from a keyless
+adsb.lol feed — SVG air picture with heading vectors and range rings,
+per-track state table (position, altitude, speed, age), and live metrics.*
 
 ```mermaid
 flowchart LR

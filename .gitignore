@@ -5,6 +5,7 @@ cpp/build/
 __pycache__/
 .venv/
 *.pyc
+.pytest_cache/
 
 # Node (dashboard, later milestones)
 node_modules/
@@ -15,3 +16,7 @@ dist/
 .idea/
 Thumbs.db
 .DS_Store
+
+# Local tooling config and logs
+.claude/
+*.log
