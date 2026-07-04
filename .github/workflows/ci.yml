@@ -1,0 +1,60 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  cpp:
+    name: C++ core — build, unit tests, replay validation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install ninja
+        run: sudo apt-get update && sudo apt-get install -y ninja-build
+      - name: Configure
+        run: cmake -S cpp -B cpp/build -G Ninja -DCMAKE_BUILD_TYPE=Release
+      - name: Build
+        run: cmake --build cpp/build
+      - name: Unit tests
+        run: ctest --test-dir cpp/build --output-on-failure
+      - name: Replay validation (identities hidden, scored vs ADS-B ids)
+        run: |
+          cpp/build/adsb_replay data/session_live_columbus.csv --assoc hungarian | tee replay.log
+          acc=$(grep -oP 'association accuracy\s*:\s*\K[0-9.]+' replay.log)
+          echo "measured association accuracy: $acc%"
+          awk -v a="$acc" 'BEGIN { exit (a >= 99.0) ? 0 : 1 }'
+
+  python:
+    name: Python — ingestion + backend tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      - name: Install dependencies
+        run: pip install -r backend/requirements.txt
+      - name: Tests
+        run: python -m pytest backend/tests ingest/tests -q
+
+  dashboard:
+    name: Dashboard — strict TypeScript build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: dashboard/package-lock.json
+      - name: Install dependencies
+        run: npm ci
+        working-directory: dashboard
+      - name: Build
+        run: npm run build
+        working-directory: dashboard

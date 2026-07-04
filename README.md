@@ -1,5 +1,7 @@
 # Multi-Aircraft ADS-B Tracker
 
+[![CI](https://github.com/AdhritSingh21/multi-aircraft-adsb-tracker/actions/workflows/ci.yml/badge.svg)](https://github.com/AdhritSingh21/multi-aircraft-adsb-tracker/actions/workflows/ci.yml)
+
 A real-time multi-target aircraft tracking system: a **C++17 tracking core**
 (per-track Kalman filters, χ²-gated nearest-neighbor and Hungarian data
 association) fed by **live ADS-B ingestion**, exposed through a
@@ -162,8 +164,7 @@ uvicorn backend.app:app --port 8000     # env: ADSB_SESSION, ADSB_SPEED, ADSB_AS
 ## Future work
 
 Process-noise tuning / IMM for maneuver robustness · Leaflet basemap option
-· CI workflow · continuous live-tracking daemon mode · dense-traffic
-Hungarian-vs-NN study.
+· continuous live-tracking daemon mode · dense-traffic Hungarian-vs-NN study.
 
 ## License
 
