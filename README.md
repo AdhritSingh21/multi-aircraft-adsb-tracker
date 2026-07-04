@@ -4,8 +4,7 @@ A real-time multi-target aircraft tracking system: a **C++17 tracking core**
 (per-track Kalman filters, χ²-gated nearest-neighbor and Hungarian data
 association) fed by **live ADS-B ingestion**, exposed through a
 **FastAPI/WebSocket backend**, and visualized on a **React dashboard** with
-an SVG radar-style air picture. Built incrementally with tests at every
-milestone and only replay-measured, reproducible performance claims.
+an SVG radar-style air picture.
 
 ![Live dashboard — 29 concurrent aircraft tracked over Columbus, OH](docs/adsb-dashboard-validation.png)
 
