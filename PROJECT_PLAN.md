@@ -148,11 +148,28 @@ adsb-tracker/
   LIVE badge, and track table during a replayed 36-aircraft session
   (31 concurrent tracks observed).
 
-### M6 — Polish for GitHub/resume
-- [ ] Architecture diagram, README polish, screenshots/GIF
-- [ ] Performance metrics on replay data: active tracks maintained, update
-  rate, association accuracy
-- **Accepted when:** repo is presentable cold to a hiring manager.
+### M6 — Polish for GitHub/resume  ✅
+- [x] Architecture: Mermaid system diagram in README + docs/ARCHITECTURE.md
+  (component walkthrough, adsb_stream line-protocol ICD, design decisions,
+  sequence diagram, testing strategy)
+- [x] README restructured for a cold reader: pitch, 3-command demo,
+  measured-results table (every number re-captured at the quoting commit,
+  with reproduction commands), what-it-demonstrates, defense/aerospace
+  relevance, known limitations, future work
+- [x] Performance metrics on replay data: association accuracy 99.23% live /
+  100% sample (ids hidden), 32 active + 37 created tracks on the live
+  session, stale removals per mode, update rate reported honestly as
+  data-bounded (0.3–1 Hz observed, ≤2 Hz by design)
+- [x] MIT LICENSE added
+- [—] Screenshots/GIF: dropped from scope — screenshot tooling was
+  unreliable in this environment; dashboard visuals were verified by human
+  inspection instead (can be added by hand anytime)
+- **Deferred to future work** (documented in README): process-noise
+  tuning/IMM for maneuver fragmentation, Leaflet basemap, CI workflow,
+  live daemon mode, dense-traffic association study
+- **Accepted when:** repo is presentable cold to a hiring manager. ✅
+  Doc-only milestone: zero source changes under cpp/, ingest/, backend/,
+  dashboard/, data/.
 
 ## Rules of engagement
 - Work stays inside `adsb-tracker/`; no unrelated files touched.
