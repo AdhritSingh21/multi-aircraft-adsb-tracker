@@ -1,6 +1,7 @@
 # Multi-Aircraft ADS-B Tracker
 
 [![CI](https://github.com/AdhritSingh21/multi-aircraft-adsb-tracker/actions/workflows/ci.yml/badge.svg)](https://github.com/AdhritSingh21/multi-aircraft-adsb-tracker/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 A real-time multi-target aircraft tracking system: a **C++17 tracking core**
 (per-track Kalman filters, χ²-gated nearest-neighbor and Hungarian data
